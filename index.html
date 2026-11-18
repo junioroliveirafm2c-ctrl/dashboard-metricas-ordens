@@ -1,0 +1,701 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Dashboard Elite PCM - Medidor de Atendimento por Área</title>
+  <script src="vendor/chart.umd.min.js"></script>
+  <script src="data/dados_embutidos.js"></script>
+  <style>
+    :root {
+      --bg: #0b1220;
+      --bg2: #121b2f;
+      --card: #17243d;
+      --card2: #1d2d4d;
+      --line: #2a3f63;
+      --text: #e8eefc;
+      --muted: #9fb0d1;
+      --accent: #4cc9f0;
+      --accent2: #4361ee;
+      --good: #2ecc71;
+      --warn: #f1c40f;
+      --bad: #e74c3c;
+      --neutral: #95a5a6;
+    }
+    * { box-sizing: border-box; }
+    body { margin: 0; font-family: Segoe UI, Arial, sans-serif; background: linear-gradient(180deg, #09101d 0%, #0f172a 100%); color: var(--text); }
+    header { padding: 20px 24px; border-bottom: 1px solid var(--line); background: rgba(10,16,30,.9); position: sticky; top: 0; z-index: 10; backdrop-filter: blur(6px); }
+    h1 { margin: 0 0 6px; font-size: 24px; letter-spacing: .3px; }
+    .subtitle { color: var(--muted); font-size: 13px; }
+    .container { padding: 18px 20px 40px; }
+    .filters, .panel, .kpi-grid, .charts-grid, .grid-2, .grid-3 { gap: 14px; }
+    .filters { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); margin-bottom: 16px; }
+    .control { background: var(--card); border: 1px solid var(--line); border-radius: 10px; padding: 10px; }
+    .control label { display: block; font-size: 12px; color: var(--muted); margin-bottom: 6px; }
+    select, input[type="number"], input[type="text"] { width: 100%; background: #0f1a2e; color: var(--text); border: 1px solid var(--line); border-radius: 8px; padding: 8px; }
+    .tabs { display: flex; flex-wrap: wrap; gap: 8px; margin: 8px 0 16px; }
+    .tab-btn { background: var(--card); color: var(--text); border: 1px solid var(--line); padding: 10px 14px; border-radius: 10px; cursor: pointer; }
+    .tab-btn.active { background: linear-gradient(135deg, var(--accent2), #2a52be); border-color: #5a7de6; }
+    .tab { display: none; }
+    .tab.active { display: block; }
+    .kpi-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); margin-bottom: 16px; }
+    .kpi { background: linear-gradient(180deg, var(--card2), var(--card)); border: 1px solid var(--line); border-radius: 14px; padding: 14px; min-height: 110px; }
+    .kpi .label { color: var(--muted); font-size: 12px; margin-bottom: 8px; }
+    .kpi .value { font-size: 28px; font-weight: 700; line-height: 1.1; }
+    .kpi .sub { color: var(--muted); font-size: 12px; margin-top: 8px; }
+    .panel { background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 14px; margin-bottom: 16px; }
+    .panel h2 { margin: 0 0 10px; font-size: 18px; }
+    .panel h3 { margin: 0 0 8px; font-size: 15px; color: #d7e4ff; }
+    .charts-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); }
+    .chart-box { background: #111b30; border: 1px solid var(--line); border-radius: 12px; padding: 10px; min-height: 320px; }
+    .chart-box canvas { width: 100% !important; height: 280px !important; }
+    .grid-2 { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); }
+    .grid-3 { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); }
+    table { width: 100%; border-collapse: collapse; font-size: 13px; }
+    th, td { border-bottom: 1px solid var(--line); padding: 8px; text-align: left; vertical-align: top; }
+    th { color: var(--muted); font-weight: 600; position: sticky; top: 0; background: #111b30; }
+    .table-wrap { max-height: 520px; overflow: auto; border: 1px solid var(--line); border-radius: 10px; }
+    .badge { display: inline-block; padding: 3px 8px; border-radius: 999px; font-size: 11px; font-weight: 600; }
+    .b-good { background: rgba(46,204,113,.18); color: #7dffb2; }
+    .b-warn { background: rgba(241,196,15,.18); color: #ffe082; }
+    .b-bad { background: rgba(231,76,60,.18); color: #ffb0a8; }
+    .b-neutral { background: rgba(149,165,166,.18); color: #d0d7db; }
+    .note { color: var(--muted); font-size: 12px; margin-top: 6px; }
+    .small { font-size: 12px; color: var(--muted); }
+    .metric-row { display: flex; justify-content: space-between; padding: 6px 0; border-bottom: 1px dashed var(--line); }
+    .metric-row:last-child { border-bottom: none; }
+    .alert { padding: 10px 12px; border-radius: 10px; border: 1px solid var(--line); margin-bottom: 8px; background: #13203a; }
+    .alert.up { border-color: rgba(231,76,60,.5); }
+    .alert.down { border-color: rgba(46,204,113,.5); }
+    .flex { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+    button.action { background: #243b61; color: var(--text); border: 1px solid var(--line); padding: 8px 10px; border-radius: 8px; cursor: pointer; }
+    .gauge-wrap { display:flex; flex-direction:column; align-items:center; justify-content:center; height:280px; }
+    .gauge-value { font-size: 30px; font-weight: 700; margin-top: -10px; }
+    .gauge-sub { color: var(--muted); font-size: 13px; }
+    .footer-note { margin-top: 8px; color: var(--muted); font-size: 12px; }
+    @media (max-width: 700px) { h1 { font-size: 20px; } .chart-box canvas { height: 240px !important; } }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>Dashboard Elite PCM — Medidor de Atendimento por Área</h1>
+    <div class="subtitle" id="subtitle"></div>
+  </header>
+  <div class="container">
+    <div class="filters" id="filters"></div>
+    <div class="tabs" id="tabs"></div>
+
+    <section id="tab-executivo" class="tab active">
+      <div class="kpi-grid" id="kpis-executivo"></div>
+      <div class="charts-grid">
+        <div class="chart-box"><h3>Atendimentos por área</h3><canvas id="ch-area-bar"></canvas></div>
+        <div class="chart-box"><h3>Atendimento por mês</h3><canvas id="ch-mes-col"></canvas></div>
+        <div class="chart-box"><h3>Evolução mensal e anual</h3><canvas id="ch-evolucao"></canvas></div>
+        <div class="chart-box"><h3>Participação percentual por área</h3><canvas id="ch-rosca"></canvas></div>
+        <div class="chart-box"><h3>Atendimento por área e status</h3><canvas id="ch-empilhado"></canvas></div>
+        <div class="chart-box"><h3>Medidor vs meta mensal (área selecionada)</h3><div id="gauge-meta" class="gauge-wrap"></div></div>
+        <div class="chart-box"><h3>Ranking TOP 10 áreas</h3><canvas id="ch-top10"></canvas></div>
+        <div class="chart-box"><h3>Matriz gerencial área × mês</h3><div class="table-wrap" id="matriz-wrap" style="max-height:280px"></div></div>
+      </div>
+      <div class="panel">
+        <h2>Inteligência Analítica</h2>
+        <div class="grid-3">
+          <div><h3>Variação percentual entre meses</h3><div id="analise-variacao"></div></div>
+          <div><h3>Áreas com aumento/redução de demanda</h3><div id="analise-areas-var"></div></div>
+          <div><h3>Concentração e alertas</h3><div id="analise-alertas"></div></div>
+        </div>
+        <div class="note">Nota: "Ranking de produtividade por volume de ordens registradas" reflete volume de registros, não produtividade individual ou eficiência operacional.</div>
+      </div>
+    </section>
+
+    <section id="tab-medidor" class="tab">
+      <div class="panel"><h2>Medidor de Atendimento por Área</h2><div class="small">Painel específico atualizado conforme filtros. Comparativos calculados com base nos filtros de área e nos períodos selecionados/disponíveis.</div></div>
+      <div class="kpi-grid" id="kpis-medidor"></div>
+      <div class="grid-2">
+        <div class="panel"><h3>Resumo do contexto selecionado</h3><div id="medidor-resumo"></div></div>
+        <div class="panel"><h3>Distribuição por status (área/período filtrado)</h3><canvas id="ch-medidor-status" style="height:260px"></canvas></div>
+      </div>
+      <div class="grid-2">
+        <div class="panel"><h3>Evolução do atendimento da área</h3><canvas id="ch-medidor-evolucao" style="height:280px"></canvas></div>
+        <div class="panel"><h3>Comparativos</h3><div id="medidor-comparativos"></div></div>
+      </div>
+    </section>
+
+    <section id="tab-evolucao" class="tab">
+      <div class="panel"><h2>Painel de Evolução Mensal e Anual</h2></div>
+      <div class="charts-grid">
+        <div class="chart-box"><h3>Evolução mensal (período filtrado)</h3><canvas id="ch-evo-mensal"></canvas></div>
+        <div class="chart-box"><h3>Evolução anual</h3><canvas id="ch-evo-anual"></canvas></div>
+        <div class="chart-box" style="grid-column:1/-1"><h3>Tendência por área ao longo do tempo</h3><canvas id="ch-evo-area-tempo"></canvas></div>
+      </div>
+      <div class="panel"><h3>Tabela de evolução (mês × ano)</h3><div class="table-wrap" id="tbl-evolucao"></div></div>
+    </section>
+
+    <section id="tab-status" class="tab">
+      <div class="panel"><h2>Painel de Status das Ordens</h2><div class="small">Classificação de situação baseada no dicionário editável de status (proposta, validar). Ordens não são consideradas concluídas automaticamente sem verificação dos status.</div></div>
+      <div class="kpi-grid" id="kpis-status"></div>
+      <div class="charts-grid">
+        <div class="chart-box"><h3>Distribuição por situação</h3><canvas id="ch-status-situacao"></canvas></div>
+        <div class="chart-box"><h3>Status do sistema (top)</h3><canvas id="ch-status-sistema"></canvas></div>
+        <div class="chart-box"><h3>Status do usuário (top)</h3><canvas id="ch-status-usuario"></canvas></div>
+        <div class="chart-box"><h3>Situação por área</h3><canvas id="ch-status-area"></canvas></div>
+      </div>
+      <div class="panel"><h3>Dicionário de classificação de status (editável na sessão)</h3>
+        <div class="note">Ajuste a situação de cada Status do sistema conforme validação. Categorias sugeridas: Concluída, Pendente, Em Execução, Não Informada. Após editar, os indicadores são recalculados.</div>
+        <div class="flex" style="margin:8px 0"><button class="action" id="btn-export-status">Exportar classificação de status (JSON)</button></div>
+        <div class="table-wrap" id="tbl-status-dict"></div>
+      </div>
+    </section>
+
+    <section id="tab-tabela" class="tab">
+      <div class="panel"><h2>Tabela Detalhada</h2><div class="flex" style="margin-bottom:8px"><input id="busca-tabela" type="text" placeholder="Filtrar texto na tabela (ordem, local, texto breve...)" style="max-width:420px" /><span class="small" id="tabela-count"></span></div>
+        <div class="table-wrap" id="tbl-detalhada"></div>
+      </div>
+    </section>
+
+    <section id="tab-dicionario" class="tab">
+      <div class="panel"><h2>Dicionário de Classificação das Áreas</h2>
+        <div class="note">Áreas identificadas a partir do campo "Local de instalação" (código derivado dos dados reais). Tabela editável: ajuste o nome de exibição conforme necessário. Registros sem classificação permanecem como "NÃO CLASSIFICADO".</div>
+        <div class="flex" style="margin:8px 0"><button class="action" id="btn-export-areas">Exportar classificação de áreas (JSON)</button></div>
+        <div class="table-wrap" id="tbl-areas"></div>
+      </div>
+      <div class="panel"><h2>Metas mensais (cadastro)</h2>
+        <div class="note">Metas não existem na base original. Informe uma meta mensal para a área selecionada no filtro (ou meta global quando Área = Todas) para habilitar o velocímetro. Salve para aplicar.</div>
+        <div class="flex" style="margin:8px 0">
+          <div style="min-width:220px"><label class="small">Área alvo</label><select id="meta-area"></select></div>
+          <div style="min-width:160px"><label class="small">Ano</label><select id="meta-ano"></select></div>
+          <div style="min-width:160px"><label class="small">Mês</label><select id="meta-mes"></select></div>
+          <div style="min-width:160px"><label class="small">Meta (qtd ordens)</label><input id="meta-valor" type="number" min="0" step="1" placeholder="Não informada" /></div>
+          <div style="align-self:end"><button class="action" id="btn-salvar-meta">Salvar meta</button></div>
+          <div style="align-self:end"><button class="action" id="btn-export-metas">Exportar metas (JSON)</button></div>
+        </div>
+        <div id="meta-atual" class="small"></div>
+      </div>
+    </section>
+
+    <section id="tab-atualizacao" class="tab">
+      <div class="panel"><h2>Estrutura para Atualização da Base</h2>
+        <p>Esta solução foi preparada para receber novas linhas na planilha original preservando histórico e configurações editáveis.</p>
+        <ol>
+          <li>Substitua/atualize o arquivo fonte: <b id="fonte-path"></b></li>
+          <li>Execute o script de atualização: <code>python build_data.py</code> (na pasta do dashboard).</li>
+          <li>O script reimporta os registros, remove duplicidades de <b>Ordem</b>, atualiza indicadores/gráficos/rankings/filtros e preserva <code>config/classificacao_areas.json</code>, <code>config/classificacao_status.json</code> e <code>config/metas.json</code> (mantendo ajustes já feitos e adicionando novas áreas/status encontrados).</li>
+          <li>Reabra/atualize esta página (<code>index.html</code>) para carregar os dados atualizados.</li>
+        </ol>
+        <div class="note">Regra aplicada na atualização: ordens duplicadas não são contadas mais de uma vez; mês/ano derivados de "Data-base do início"; área derivada de "Local de instalação"; sem inventar informações ausentes (ex.: metas permanecem "não informadas" até cadastro).</div>
+      </div>
+      <div class="panel"><h3>Resumo da base carregada</h3><div id="resumo-base"></div></div>
+    </section>
+
+    <div class="footer-note">Fonte: METRICAS DE ORDENS.XLSX (dados reais). Dashboard gerencial PCM — todos os cálculos derivados exclusivamente da base e das classificações configuradas.</div>
+  </div>
+
+<script>
+const RAW = window.DB_DATA;
+let AREA_CONFIG = JSON.parse(JSON.stringify(window.DB_AREA_CONFIG));
+let STATUS_CONFIG = JSON.parse(JSON.stringify(window.DB_STATUS_CONFIG));
+let METAS = JSON.parse(JSON.stringify(window.DB_METAS));
+let charts = {};
+
+function monthName(m){ return ['','Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'][m] || m; }
+function fmtPct(v){ if (v===null || v===undefined || isNaN(v)) return 'Não informado'; return (v>=0?'+':'') + v.toFixed(1) + '%'; }
+function fmtNum(v){ return (v===null||v===undefined) ? '-' : v.toLocaleString('pt-BR'); }
+function escapeHtml(s){ return String(s??'').replace(/[&<>"']/g, c=>({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;"}[c])); }
+
+function applyConfigs(records){
+  return records.map(r => {
+    const area = (AREA_CONFIG.mapeamento||{})[r.area_codigo] || r.area_codigo || 'NÃO CLASSIFICADO';
+    const st = (STATUS_CONFIG.status_sistema||{})[r.status_sistema];
+    const situacao = (st && typeof st==='object' ? st.situacao : st) || 'Não Informada';
+    return {...r, area, situacao};
+  });
+}
+let allRecords = applyConfigs(RAW.records);
+
+const state = { ano:'Todos', mes:'Todos', area:'Todas', centro:'Todos', tipo:'Todos', stUsuario:'Todos', stSistema:'Todos', busca:'' };
+
+function uniqueSorted(arr){ return [...new Set(arr.filter(x=>x!=='' && x!==null && x!==undefined))].sort((a,b)=>String(a).localeCompare(String(b),'pt-BR')); }
+function uniqueNums(arr){ return [...new Set(arr.filter(x=>x!==null && x!==undefined))].sort((a,b)=>a-b); }
+
+function buildFilters(){
+  const anos = uniqueNums(allRecords.map(r=>r.ano));
+  const meses = [...Array(12)].map((_,i)=>i+1);
+  const areas = uniqueSorted(allRecords.map(r=>r.area));
+  const centros = uniqueSorted(allRecords.map(r=>r.centro_trabalho));
+  const tipos = uniqueSorted(allRecords.map(r=>r.tipo_ordem));
+  const stU = uniqueSorted(allRecords.map(r=>r.status_usuario));
+  const stS = uniqueSorted(allRecords.map(r=>r.status_sistema));
+  const defs = [
+    ['ano','Ano',['Todos',...anos]],
+    ['mes','Mês',['Todos',...meses.map(m=>({v:String(m),t:monthName(m)}))]],
+    ['area','Área',['Todas',...areas]],
+    ['centro','Centro de trabalho',['Todos',...centros]],
+    ['tipo','Tipo de ordem',['Todos',...tipos]],
+    ['stUsuario','Status do usuário',['Todos',...stU]],
+    ['stSistema','Status do sistema',['Todos',...stS]],
+  ];
+  const wrap = document.getElementById('filters');
+  wrap.innerHTML = defs.map(([k,label,opts])=>`<div class="control"><label>${label}</label><select id="f-${k}">${opts.map(o=>{
+      if (typeof o==='object') return `<option value="${escapeHtml(o.v)}">${escapeHtml(o.t)}</option>`;
+      return `<option value="${escapeHtml(o)}">${escapeHtml(o)}</option>`;
+    }).join('')}</select></div>`).join('');
+  defs.forEach(([k])=>{
+    const el = document.getElementById('f-'+k);
+    el.value = String(state[k]);
+    el.addEventListener('change', ()=>{ state[k]=el.value; renderAll(); });
+  });
+}
+
+function getFiltered(){
+  return allRecords.filter(r=>{
+    if (state.ano!=='Todos' && String(r.ano)!==String(state.ano)) return false;
+    if (state.mes!=='Todos' && String(r.mes)!==String(state.mes)) return false;
+    if (state.area!=='Todas' && r.area!==state.area) return false;
+    if (state.centro!=='Todos' && r.centro_trabalho!==state.centro) return false;
+    if (state.tipo!=='Todos' && r.tipo_ordem!==state.tipo) return false;
+    if (state.stUsuario!=='Todos' && r.status_usuario!==state.stUsuario) return false;
+    if (state.stSistema!=='Todos' && r.status_sistema!==state.stSistema) return false;
+    return true;
+  });
+}
+function getFilteredExcept(exceptKeys){
+  return allRecords.filter(r=>{
+    for (const k of ['ano','mes','area','centro','tipo','stUsuario','stSistema']){
+      if (exceptKeys.includes(k)) continue;
+      if (k==='ano' && state.ano!=='Todos' && String(r.ano)!==String(state.ano)) return false;
+      if (k==='mes' && state.mes!=='Todos' && String(r.mes)!==String(state.mes)) return false;
+      if (k==='area' && state.area!=='Todas' && r.area!==state.area) return false;
+      if (k==='centro' && state.centro!=='Todos' && r.centro_trabalho!==state.centro) return false;
+      if (k==='tipo' && state.tipo!=='Todos' && r.tipo_ordem!==state.tipo) return false;
+      if (k==='stUsuario' && state.stUsuario!=='Todos' && r.status_usuario!==state.stUsuario) return false;
+      if (k==='stSistema' && state.stSistema!=='Todos' && r.status_sistema!==state.stSistema) return false;
+    }
+    return true;
+  });
+}
+
+function countBy(arr, keyFn){ const m=new Map(); arr.forEach(x=>{const k=keyFn(x); m.set(k,(m.get(k)||0)+1);}); return m; }
+function sortEntries(map, desc=true){ return [...map.entries()].sort((a,b)=> desc ? b[1]-a[1] || String(a[0]).localeCompare(String(b[0])) : a[1]-b[1]); }
+
+function destroyChart(id){ if(charts[id]){ charts[id].destroy(); delete charts[id]; } }
+function makeChart(id, config){ destroyChart(id); const ctx=document.getElementById(id); if(!ctx) return; charts[id]=new Chart(ctx, config); }
+
+function kpiCard(label,value,sub=''){
+  return `<div class="kpi"><div class="label">${escapeHtml(label)}</div><div class="value">${escapeHtml(String(value))}</div>${sub?`<div class="sub">${sub}</div>`:''}</div>`;
+}
+
+function renderTabs(){
+  const tabs=[
+    ['executivo','Painel Executivo Geral'],['medidor','Atendimento por Área'],['evolucao','Evolução Mensal e Anual'],['status','Status das Ordens'],['tabela','Tabela Detalhada'],['dicionario','Dicionário de Classificação'],['atualizacao','Atualização']
+  ];
+  const wrap=document.getElementById('tabs');
+  wrap.innerHTML=tabs.map((t,i)=>`<button class="tab-btn ${i===0?'active':''}" data-tab="${t[0]}">${t[1]}</button>`).join('');
+  wrap.querySelectorAll('.tab-btn').forEach(btn=>btn.addEventListener('click',()=>{
+    wrap.querySelectorAll('.tab-btn').forEach(b=>b.classList.remove('active'));
+    btn.classList.add('active');
+    document.querySelectorAll('.tab').forEach(sec=>sec.classList.remove('active'));
+    document.getElementById('tab-'+btn.dataset.tab).classList.add('active');
+  }));
+}
+
+function getMeta(area, ano, mes){
+  if (!ano || !mes || ano==='Todos' || mes==='Todos') return null;
+  const key = `${ano}-${String(mes).padStart(2,'0')}`;
+  const byArea = METAS.metas_por_area_mes || {};
+  if (area && area!=='Todas' && byArea[area] && byArea[area][key]!=null) return Number(byArea[area][key]);
+  if ((area==='Todas' || !area) && METAS.meta_global_mensal!=null && METAS.meta_global_mensal[key]!=null) return Number(METAS.meta_global_mensal[key]);
+  // if specific area selected but no area meta, no fallback invented
+  return null;
+}
+
+function renderGauge(containerId, value, meta){
+  const el=document.getElementById(containerId); if(!el) return;
+  const v = value||0;
+  if (meta==null || isNaN(meta)){
+    el.innerHTML = `<div class="gauge-value">${fmtNum(v)}</div><div class="gauge-sub">Atendimentos no contexto filtrado</div><div class="note">Meta mensal: Não informada (cadastrar no Dicionário/Metas).</div>`;
+    return;
+  }
+  const pct = meta>0 ? (v/meta*100) : 0;
+  const pctClamped = Math.max(0, Math.min(pct, 200));
+  const angle = Math.min(pctClamped, 100) * 1.8; // 0..180deg
+  const color = pct>=100 ? 'var(--good)' : pct>=80 ? 'var(--warn)' : 'var(--accent)';
+  el.innerHTML = `
+    <svg width="260" height="150" viewBox="0 0 260 150">
+      <path d="M 30 130 A 100 100 0 0 1 230 130" fill="none" stroke="#243b61" stroke-width="18" stroke-linecap="round"/>
+      <path d="M 30 130 A 100 100 0 0 1 230 130" fill="none" stroke="${getComputedStyle(document.documentElement).getPropertyValue(color.replace('var(','').replace(')',''))||'#4cc9f0'}" stroke-width="18" stroke-linecap="round" stroke-dasharray="${Math.PI*100}" stroke-dashoffset="${Math.PI*100*(1-Math.min(pctClamped,100)/100)}"/>
+      <text x="130" y="110" text-anchor="middle" fill="#e8eefc" font-size="22" font-weight="700">${fmtNum(v)}</text>
+      <text x="130" y="132" text-anchor="middle" fill="#9fb0d1" font-size="12">Meta: ${fmtNum(meta)} (${pct.toFixed(1)}%)</text>
+    </svg>
+    <div class="gauge-sub">Atendimentos da área selecionada vs meta mensal</div>`;
+}
+
+function renderAll(){
+  allRecords = applyConfigs(RAW.records);
+  const f = getFiltered();
+  renderKPIs(f);
+  renderExecutiveCharts(f);
+  renderMedidor(f);
+  renderEvolucao(f);
+  renderStatusTab(f);
+  renderTabela(f);
+  renderDicionario();
+  renderAtualizacao();
+}
+
+function renderKPIs(f){
+  const total = f.length;
+  const byArea = sortEntries(countBy(f,r=>r.area));
+  const concl = f.filter(r=>r.situacao==='Concluída').length;
+  const pend = f.filter(r=>r.situacao==='Pendente').length;
+  const exec = f.filter(r=>r.situacao==='Em Execução').length;
+  const topArea = byArea.length? `${byArea[0][0]} (${fmtNum(byArea[0][1])})` : 'Não informado';
+  const areaLabel = state.area==='Todas' ? 'Todas as áreas (filtradas)' : state.area;
+  const mesLabel = state.mes==='Todos' ? 'Todos os meses (filtrado)' : monthName(Number(state.mes));
+  const anoLabel = state.ano==='Todos' ? 'Todos os anos (filtrado)' : state.ano;
+  document.getElementById('kpis-executivo').innerHTML = [
+    kpiCard('TOTAL DE ORDENS', fmtNum(total), 'Ordens únicas no contexto filtrado'),
+    kpiCard('ATENDIMENTOS POR ÁREA', fmtNum(total), `Contexto: ${escapeHtml(areaLabel)}`),
+    kpiCard('ATENDIMENTOS NO MÊS', fmtNum(total), `Mês: ${escapeHtml(String(mesLabel))}`),
+    kpiCard('ATENDIMENTOS NO ANO', fmtNum(total), `Ano: ${escapeHtml(String(anoLabel))}`),
+    kpiCard('ORDENS CONCLUÍDAS', fmtNum(concl), 'Conforme classificação validada dos status'),
+    kpiCard('ORDENS PENDENTES', fmtNum(pend), 'Conforme classificação validada dos status'),
+    kpiCard('ORDENS EM EXECUÇÃO', fmtNum(exec), 'Conforme classificação validada dos status'),
+    kpiCard('ÁREA COM MAIOR VOLUME', topArea, 'Maior quantidade no contexto filtrado'),
+  ].join('');
+}
+
+function monthKey(r){ return (r.ano && r.mes) ? `${r.ano}-${String(r.mes).padStart(2,'0')}` : 'Sem data'; }
+function monthLabel(key){ if(key==='Sem data') return key; const [y,m]=key.split('-'); return `${monthName(Number(m)).slice(0,3)}/${y}`; }
+
+function renderExecutiveCharts(f){
+  const byArea = sortEntries(countBy(f,r=>r.area));
+  const labelsA = byArea.map(x=>x[0]); const dataA = byArea.map(x=>x[1]);
+  makeChart('ch-area-bar',{type:'bar',data:{labels:labelsA,datasets:[{label:'Ordens',data:dataA,backgroundColor:'#4cc9f0'}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{x:{ticks:{color:'#9fb0d1'}},y:{ticks:{color:'#9fb0d1'}}}}});
+
+  const byMonth = [...countBy(f,monthKey).entries()].filter(([k])=>k!=='Sem data').sort((a,b)=>a[0].localeCompare(b[0]));
+  makeChart('ch-mes-col',{type:'bar',data:{labels:byMonth.map(x=>monthLabel(x[0])),datasets:[{label:'Ordens',data:byMonth.map(x=>x[1]),backgroundColor:'#4361ee'}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{x:{ticks:{color:'#9fb0d1',maxRotation:60,minRotation:30}},y:{ticks:{color:'#9fb0d1'}}}}});
+
+  const byYear = [...countBy(f,r=>r.ano||'Sem ano').entries()].sort((a,b)=>String(a[0]).localeCompare(String(b[0])));
+  const years = byYear.map(x=>String(x[0]));
+  const yearTotals = byYear.map(x=>x[1]);
+  makeChart('ch-evolucao',{type:'line',data:{labels:byMonth.map(x=>monthLabel(x[0])),datasets:[{label:'Mensal',data:byMonth.map(x=>x[1]),borderColor:'#4cc9f0',backgroundColor:'rgba(76,201,240,.2)',tension:.25},{label:'Total anual (ref.)',data:byMonth.map(x=>{const y=x[0].slice(0,4); const idx=years.indexOf(y); return idx>=0?yearTotals[idx]:null;}),borderColor:'#f1c40f',borderDash:[6,4],tension:.2,spanGaps:true}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{labels:{color:'#d7e4ff'}}},scales:{x:{ticks:{color:'#9fb0d1',maxRotation:60,minRotation:30}},y:{ticks:{color:'#9fb0d1'}}}}});
+
+  const topForPie = byArea.slice(0,10);
+  const other = byArea.slice(10).reduce((s,x)=>s+x[1],0);
+  const pieLabels = topForPie.map(x=>x[0]).concat(other?['Outras']:[]);
+  const pieData = topForPie.map(x=>x[1]).concat(other?[other]:[]);
+  makeChart('ch-rosca',{type:'doughnut',data:{labels:pieLabels,datasets:[{data:pieData,backgroundColor:['#4cc9f0','#4361ee','#3a86ff','#8338ec','#ff006e','#fb5607','#ffbe0b','#2ecc71','#1abc9c','#95a5a6','#6c757d']}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{labels:{color:'#d7e4ff'}}}}});
+
+  const situacoes = ['Concluída','Em Execução','Pendente','Não Informada'];
+  const topAreas = labelsA.slice(0,10);
+  const stackData = situacoes.map((sit,i)=>({label:sit,data:topAreas.map(a=>f.filter(r=>r.area===a && r.situacao===sit).length),backgroundColor:['#2ecc71','#4cc9f0','#f1c40f','#95a5a6'][i]}));
+  makeChart('ch-empilhado',{type:'bar',data:{labels:topAreas,datasets:stackData},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{labels:{color:'#d7e4ff'}}},scales:{x:{stacked:true,ticks:{color:'#9fb0d1'}},y:{stacked:true,ticks:{color:'#9fb0d1'}}}}});
+
+  const meta = getMeta(state.area, state.ano, state.mes);
+  renderGauge('gauge-meta', f.length, meta);
+
+  const top10 = byArea.slice(0,10);
+  makeChart('ch-top10',{type:'bar',data:{labels:top10.map(x=>x[0]),datasets:[{label:'Ordens',data:top10.map(x=>x[1]),backgroundColor:'#2ecc71'}]},options:{indexAxis:'y',responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{x:{ticks:{color:'#9fb0d1'}},y:{ticks:{color:'#9fb0d1'}}}}});
+
+  renderMatriz(f);
+  renderAnalytics(f, byMonth);
+}
+
+function renderMatriz(f){
+  const months=[...new Set(f.filter(r=>r.ano&&r.mes).map(r=>monthKey(r)))].sort();
+  const areas=[...new Set(f.map(r=>r.area))].sort((a,b)=>a.localeCompare(b,'pt-BR'));
+  const m=new Map();
+  f.forEach(r=>{ if(!r.ano||!r.mes) return; const k=r.area+'||'+monthKey(r); m.set(k,(m.get(k)||0)+1); });
+  let html='<table><thead><tr><th>Área</th>'+months.map(k=>`<th>${escapeHtml(monthLabel(k))}</th>`).join('')+'<th>Total</th></tr></thead><tbody>';
+  areas.forEach(a=>{ let rowTotal=0; html+=`<tr><td>${escapeHtml(a)}</td>`+months.map(k=>{const v=m.get(a+'||'+k)||0; rowTotal+=v; return `<td>${v||''}</td>`;}).join('')+`<td><b>${rowTotal}</b></td></tr>`; });
+  html+='</tbody></table>';
+  document.getElementById('matriz-wrap').innerHTML = html || '<div class="small">Sem dados.</div>';
+}
+
+function pctChange(curr, prev){ if(prev==null || prev===0) return null; return ((curr-prev)/prev)*100; }
+
+function renderAnalytics(f, byMonthEntries){
+  const months = byMonthEntries || [...countBy(f,monthKey).entries()].filter(([k])=>k!=='Sem data').sort((a,b)=>a[0].localeCompare(b[0]));
+  let varHtml='';
+  if (months.length>=2){
+    const rows = months.map((x,i)=>{ const prev=i>0?months[i-1][1]:null; const ch=pctChange(x[1],prev); const cls=ch==null?'b-neutral':(ch>0?'b-bad':'b-good'); return `<div class="metric-row"><span>${escapeHtml(monthLabel(x[0]))}: <b>${fmtNum(x[1])}</b></span><span class="badge ${cls}">${ch==null?'Base inicial':fmtPct(ch)}</span></div>`; }).slice(-12);
+    varHtml = rows.join('');
+  } else varHtml='<div class="small">Dados insuficientes para variação mensal no filtro atual.</div>';
+  document.getElementById('analise-variacao').innerHTML = varHtml;
+
+  // aumento/redução por área comparando último mês vs anterior no contexto filtrado
+  const byAreaMonth = new Map();
+  f.forEach(r=>{ if(!r.ano||!r.mes) return; const mk=monthKey(r); const k=r.area+'||'+mk; byAreaMonth.set(k,(byAreaMonth.get(k)||0)+1); });
+  let areaVarHtml='';
+  if (months.length>=2){
+    const last=months[months.length-1][0], prev=months[months.length-2][0];
+    const areas=[...new Set(f.map(r=>r.area))];
+    const comps = areas.map(a=>{const v1=byAreaMonth.get(a+'||'+prev)||0; const v2=byAreaMonth.get(a+'||'+last)||0; return {a,v1,v2,d:v2-v1,p:pctChange(v2,v1)};}).filter(x=>x.v1>0||x.v2>0).sort((x,y)=>y.d-x.d);
+    const up = comps.filter(x=>x.d>0).slice(0,5);
+    const down = comps.filter(x=>x.d<0).slice(-5).reverse();
+    areaVarHtml = `<div class="small"><b>${escapeHtml(monthLabel(prev))} → ${escapeHtml(monthLabel(last))}</b></div>`+
+      `<div style="margin-top:6px"><b>Aumento</b>${up.length?up.map(x=>`<div class="metric-row"><span>${escapeHtml(x.a)}</span><span class="badge b-bad">+${x.d} (${x.p==null?'novo':fmtPct(x.p)})</span></div>`).join(''):'<div class="small">Nenhuma área com aumento.</div>'}</div>`+
+      `<div style="margin-top:8px"><b>Redução</b>${down.length?down.map(x=>`<div class="metric-row"><span>${escapeHtml(x.a)}</span><span class="badge b-good">${x.d} (${x.p==null?'n/d':fmtPct(x.p)})</span></div>`).join(''):'<div class="small">Nenhuma área com redução.</div>'}</div>`;
+  } else areaVarHtml='<div class="small">Dados insuficientes para comparar períodos.</div>';
+  document.getElementById('analise-areas-var').innerHTML = areaVarHtml;
+
+  const byArea = sortEntries(countBy(f,r=>r.area));
+  const total = f.length || 1;
+  const alerts=[];
+  if (byArea.length){
+    const [topA, topV] = byArea[0];
+    const share = topV/total*100;
+    alerts.push(`<div class="alert"><b>Concentração de demanda:</b> ${escapeHtml(topA)} concentra ${fmtNum(topV)} ordens (${share.toFixed(1)}% do volume filtrado).</div>`);
+  }
+  if (months.length>=2){
+    const last=months[months.length-1], prev=months[months.length-2];
+    const areas=[...new Set(f.map(r=>r.area))];
+    const byAreaMonth2 = byAreaMonth;
+    areas.forEach(a=>{const v1=byAreaMonth2.get(a+'||'+prev[0])||0; const v2=byAreaMonth2.get(a+'||'+last[0])||0; const p=pctChange(v2,v1); if((p!=null && p>=30 && v2>=5) || (v1===0 && v2>=10)){
+      alerts.push(`<div class="alert up"><b>Alerta de aumento expressivo:</b> ${escapeHtml(a)} passou de ${v1} para ${v2} ordens entre ${escapeHtml(monthLabel(prev[0]))} e ${escapeHtml(monthLabel(last[0]))} (${v1===0?'novo volume relevante':fmtPct(p)}).</div>`);
+    }});
+  }
+  const volRank = byArea.slice(0,10).map((x,i)=>`<div class="metric-row"><span>${i+1}. ${escapeHtml(x[0])}</span><span>${fmtNum(x[1])} ordens</span></div>`).join('');
+  alerts.push(`<div class="panel" style="margin:8px 0 0"><h3>Ranking por volume de ordens registradas</h3>${volRank||'<div class="small">Sem dados.</div>'}<div class="note">Interpretação: volume registrado, não produtividade individual/eficiência operacional.</div></div>`);
+  document.getElementById('analise-alertas').innerHTML = alerts.join('') || '<div class="small">Sem alertas para o filtro atual.</div>';
+}
+
+function renderMedidor(f){
+  const areaSel = state.area;
+  const mesSel = state.mes;
+  const anoSel = state.ano;
+  const total = f.length;
+  // participação da área em relação ao total com mesmos filtros exceto área
+  const baseNoArea = getFilteredExcept(['area']);
+  const totalBase = baseNoArea.length || 0;
+  const part = totalBase>0 ? (total/totalBase*100) : null;
+
+  // comparativos: para área selecionada (ou todas) ao longo do tempo - usar contexto sem filtro de mês/ano para localizar períodos? melhor: usar área filtrada (se todas, considera todas) e comparar mês/ano selecionados com anterior
+  const ctxArea = getFilteredExcept(['mes','ano']); // respeita área e outros filtros
+  let compMesAnt = 'Não informado', compAnoAnt = 'Não informado';
+  let mesAnteriorLabel='-', mesmoMesAnoAntLabel='-';
+  if (anoSel!=='Todos' && mesSel!=='Todos'){
+    const y=Number(anoSel), m=Number(mesSel);
+    const curr = ctxArea.filter(r=>r.ano===y && r.mes===m).length;
+    let py=y, pm=m-1; if(pm===0){pm=12; py=y-1;}
+    const prev = ctxArea.filter(r=>r.ano===py && r.mes===pm).length;
+    const prev2 = ctxArea.filter(r=>r.ano===y-1 && r.mes===m).length;
+    mesAnteriorLabel = `${monthName(pm)}/${py}`;
+    mesmoMesAnoAntLabel = `${monthName(m)}/${y-1}`;
+    const ch1 = pctChange(curr, prev); const ch2 = pctChange(curr, prev2);
+    compMesAnt = `${fmtNum(curr)} vs ${fmtNum(prev)} (${ch1==null?'base zero/não comparável':fmtPct(ch1)})`;
+    compAnoAnt = `${fmtNum(curr)} vs ${fmtNum(prev2)} (${ch2==null?'base zero/não comparável':fmtPct(ch2)})`;
+  }
+  document.getElementById('kpis-medidor').innerHTML = [
+    kpiCard('Área selecionada', areaSel),
+    kpiCard('Mês selecionado', mesSel==='Todos'?'Todos':monthName(Number(mesSel))),
+    kpiCard('Ano selecionado', anoSel),
+    kpiCard('Quantidade total de ordens', fmtNum(total)),
+    kpiCard('Participação da área', part==null?'Não informado':part.toFixed(1)+'%', `Sobre total com mesmos filtros (exceto área): ${fmtNum(totalBase)}`),
+    kpiCard('Comparativo mês anterior', compMesAnt, `Ref.: ${mesAnteriorLabel}`),
+    kpiCard('Comparativo mesmo mês ano anterior', compAnoAnt, `Ref.: ${mesmoMesAnoAntLabel}`),
+  ].join('');
+
+  const byStatus = sortEntries(countBy(f,r=>r.situacao));
+  document.getElementById('medidor-resumo').innerHTML = `
+    <div class="metric-row"><span>Área</span><b>${escapeHtml(String(areaSel))}</b></div>
+    <div class="metric-row"><span>Mês</span><b>${escapeHtml(mesSel==='Todos'?'Todos':monthName(Number(mesSel)))}</b></div>
+    <div class="metric-row"><span>Ano</span><b>${escapeHtml(String(anoSel))}</b></div>
+    <div class="metric-row"><span>Quantidade total de ordens</span><b>${fmtNum(total)}</b></div>
+    <div class="metric-row"><span>Percentual de participação</span><b>${part==null?'Não informado':part.toFixed(2)+'%'}</b></div>
+    <div class="note">Os comparativos exigem mês e ano específicos selecionados; caso contrário são apresentados como "Não informado".</div>`;
+  makeChart('ch-medidor-status',{type:'doughnut',data:{labels:byStatus.map(x=>x[0]),datasets:[{data:byStatus.map(x=>x[1]),backgroundColor:['#2ecc71','#4cc9f0','#f1c40f','#95a5a6','#e74c3c']}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{labels:{color:'#d7e4ff'}}}}});
+
+  const evo = [...countBy(ctxArea,monthKey).entries()].filter(([k])=>k!=='Sem data').sort((a,b)=>a[0].localeCompare(b[0]));
+  makeChart('ch-medidor-evolucao',{type:'line',data:{labels:evo.map(x=>monthLabel(x[0])),datasets:[{label:'Ordens',data:evo.map(x=>x[1]),borderColor:'#4cc9f0',backgroundColor:'rgba(76,201,240,.15)',fill:true,tension:.25}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{labels:{color:'#d7e4ff'}}},scales:{x:{ticks:{color:'#9fb0d1',maxRotation:60,minRotation:30}},y:{ticks:{color:'#9fb0d1'}}}}});
+
+  let compHtml = '';
+  compHtml += `<div class="metric-row"><span>Comparativo com mês anterior (${escapeHtml(mesAnteriorLabel)})</span><b>${escapeHtml(compMesAnt)}</b></div>`;
+  compHtml += `<div class="metric-row"><span>Comparativo com mesmo mês do ano anterior (${escapeHtml(mesmoMesAnoAntLabel)})</span><b>${escapeHtml(compAnoAnt)}</b></div>`;
+  if (evo.length>=2){
+    const last=evo[evo.length-1], prev=evo[evo.length-2];
+    const ch=pctChange(last[1],prev[1]);
+    compHtml += `<div class="metric-row"><span>Variação no último período da série</span><b>${escapeHtml(fmtPct(ch))} (${escapeHtml(monthLabel(prev[0]))}→${escapeHtml(monthLabel(last[0]))})</b></div>`;
+  }
+  compHtml += `<h3 style="margin-top:12px">Distribuição por status</h3>` + (byStatus.map(x=>`<div class="metric-row"><span>${escapeHtml(x[0])}</span><b>${fmtNum(x[1])}</b></div>`).join('') || '<div class="small">Sem dados.</div>');
+  document.getElementById('medidor-comparativos').innerHTML = compHtml;
+}
+
+function renderEvolucao(f){
+  const byMonth = [...countBy(f,monthKey).entries()].filter(([k])=>k!=='Sem data').sort((a,b)=>a[0].localeCompare(b[0]));
+  makeChart('ch-evo-mensal',{type:'bar',data:{labels:byMonth.map(x=>monthLabel(x[0])),datasets:[{label:'Ordens/mês',data:byMonth.map(x=>x[1]),backgroundColor:'#4361ee'}]},options:{responsive:true,maintainAspectRatio:false,scales:{x:{ticks:{color:'#9fb0d1',maxRotation:60,minRotation:30}},y:{ticks:{color:'#9fb0d1'}}}}});
+  const byYear=[...countBy(f,r=>r.ano||'Sem ano').entries()].sort((a,b)=>String(a[0]).localeCompare(String(b[0])));
+  makeChart('ch-evo-anual',{type:'bar',data:{labels:byYear.map(x=>String(x[0])),datasets:[{label:'Ordens/ano',data:byYear.map(x=>x[1]),backgroundColor:'#2ecc71'}]},options:{responsive:true,maintainAspectRatio:false,scales:{x:{ticks:{color:'#9fb0d1'}},y:{ticks:{color:'#9fb0d1'}}}}});
+
+  const monthsKeys = byMonth.map(x=>x[0]);
+  const topAreas = sortEntries(countBy(f,r=>r.area)).slice(0,6).map(x=>x[0]);
+  const colors=['#4cc9f0','#f1c40f','#2ecc71','#ff006e','#8338ec','#fb5607'];
+  const datasets = topAreas.map((a,i)=>{
+    const map=countBy(f.filter(r=>r.area===a),monthKey);
+    return {label:a,data:monthsKeys.map(k=>map.get(k)||0),borderColor:colors[i%colors.length],tension:.25,fill:false};
+  });
+  makeChart('ch-evo-area-tempo',{type:'line',data:{labels:monthsKeys.map(monthLabel),datasets},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{labels:{color:'#d7e4ff'}}},scales:{x:{ticks:{color:'#9fb0d1',maxRotation:60,minRotation:30}},y:{ticks:{color:'#9fb0d1'}}}}});
+
+  // tabela evolução mês x ano
+  const anos=[...new Set(f.map(r=>r.ano).filter(Boolean))].sort((a,b)=>a-b);
+  let html='<table><thead><tr><th>Mês</th>'+anos.map(a=>`<th>${a}</th>`).join('')+'</tr></thead><tbody>';
+  for(let m=1;m<=12;m++){
+    html+=`<tr><td>${monthName(m)}</td>`+anos.map(a=>{const v=f.filter(r=>r.ano===a && r.mes===m).length; return `<td>${v||''}</td>`;}).join('')+'</tr>';
+  }
+  html+='</tbody></table>';
+  document.getElementById('tbl-evolucao').innerHTML = anos.length?html:'<div class="small">Sem dados com ano/mês válidos no filtro.</div>';
+}
+
+function renderStatusTab(f){
+  const concl=f.filter(r=>r.situacao==='Concluída').length;
+  const pend=f.filter(r=>r.situacao==='Pendente').length;
+  const exec=f.filter(r=>r.situacao==='Em Execução').length;
+  const ni=f.filter(r=>!['Concluída','Pendente','Em Execução'].includes(r.situacao)).length;
+  document.getElementById('kpis-status').innerHTML = [
+    kpiCard('CONCLUÍDAS', fmtNum(concl),'Classificação validada (dicionário)'),
+    kpiCard('PENDENTES', fmtNum(pend),'Classificação validada (dicionário)'),
+    kpiCard('EM EXECUÇÃO', fmtNum(exec),'Classificação validada (dicionário)'),
+    kpiCard('NÃO INFORMADA / OUTRAS', fmtNum(ni),'Sem classificação validada como concluída/pendente/execução'),
+  ].join('');
+  const bySit = sortEntries(countBy(f,r=>r.situacao));
+  makeChart('ch-status-situacao',{type:'pie',data:{labels:bySit.map(x=>x[0]),datasets:[{data:bySit.map(x=>x[1]),backgroundColor:['#2ecc71','#f1c40f','#4cc9f0','#95a5a6','#e74c3c','#8338ec']}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{labels:{color:'#d7e4ff'}}}}});
+  const bySys = sortEntries(countBy(f,r=>r.status_sistema||'(vazio)')).slice(0,12);
+  makeChart('ch-status-sistema',{type:'bar',data:{labels:bySys.map(x=>x[0]),datasets:[{label:'Ordens',data:bySys.map(x=>x[1]),backgroundColor:'#4361ee'}]},options:{indexAxis:'y',responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{x:{ticks:{color:'#9fb0d1'}},y:{ticks:{color:'#9fb0d1',font:{size:10}}}}}});
+  const byUsr = sortEntries(countBy(f,r=>r.status_usuario||'(vazio)')).slice(0,12);
+  makeChart('ch-status-usuario',{type:'bar',data:{labels:byUsr.map(x=>x[0]),datasets:[{label:'Ordens',data:byUsr.map(x=>x[1]),backgroundColor:'#4cc9f0'}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{x:{ticks:{color:'#9fb0d1'}},y:{ticks:{color:'#9fb0d1'}}}}});
+  const areas = sortEntries(countBy(f,r=>r.area)).slice(0,10).map(x=>x[0]);
+  const sits=['Concluída','Em Execução','Pendente','Não Informada'];
+  makeChart('ch-status-area',{type:'bar',data:{labels:areas,datasets:sits.map((s,i)=>({label:s,data:areas.map(a=>f.filter(r=>r.area===a && r.situacao===s).length),backgroundColor:['#2ecc71','#4cc9f0','#f1c40f','#95a5a6'][i]}))},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{labels:{color:'#d7e4ff'}}},scales:{x:{stacked:true,ticks:{color:'#9fb0d1'}},y:{stacked:true,ticks:{color:'#9fb0d1'}}}}});
+
+  renderStatusDictTable();
+}
+
+function renderStatusDictTable(){
+  const entries = Object.entries(STATUS_CONFIG.status_sistema||{}).sort((a,b)=>a[0].localeCompare(b[0],'pt-BR'));
+  const opts = ['Concluída','Pendente','Em Execução','Não Informada'];
+  let html='<table><thead><tr><th>Status do sistema</th><th>Situação (validada/editável)</th><th>Observação</th></tr></thead><tbody>';
+  entries.forEach(([k,v])=>{
+    const sit = (v&&typeof v==='object')?v.situacao:v;
+    const obs = (v&&typeof v==='object')?(v.observacao||''):'';
+    html += `<tr><td>${escapeHtml(k||'(vazio)')}</td><td><select data-st="${escapeHtml(k)}">${opts.map(o=>`<option ${o===sit?'selected':''}>${o}</option>`).join('')}</select></td><td class="small">${escapeHtml(obs)}</td></tr>`;
+  });
+  html+='</tbody></table>';
+  const wrap=document.getElementById('tbl-status-dict');
+  wrap.innerHTML = html;
+  wrap.querySelectorAll('select[data-st]').forEach(sel=>sel.addEventListener('change',()=>{
+    const k=sel.getAttribute('data-st');
+    if(!STATUS_CONFIG.status_sistema[k] || typeof STATUS_CONFIG.status_sistema[k]!==='object') STATUS_CONFIG.status_sistema[k]={situacao:sel.value,observacao:'Editado manualmente na sessão.'};
+    else { STATUS_CONFIG.status_sistema[k].situacao = sel.value; STATUS_CONFIG.status_sistema[k].observacao = 'Editado/validado manualmente na sessão.'; }
+    renderAll();
+  }));
+}
+
+function renderTabela(f){
+  const q=(state.busca||'').toLowerCase();
+  let rows=f;
+  if(q){ rows = f.filter(r => [r.ordem,r.area,r.area_codigo,r.centro_trabalho,r.tipo_ordem,r.status_usuario,r.status_sistema,r.local_instalacao,r.texto_breve,r.data_inicio,r.situacao].some(v=>String(v||'').toLowerCase().includes(q))); }
+  document.getElementById('tabela-count').textContent = `${fmtNum(rows.length)} registros exibidos (de ${fmtNum(f.length)} filtrados / ${fmtNum(allRecords.length)} totais).`;
+  const cols=[['Ordem','ordem'],['Data início','data_inicio'],['Ano','ano'],['Mês','mes'],['Área','area'],['Cód. área','area_codigo'],['Centro trab.','centro_trabalho'],['Tipo ordem','tipo_ordem'],['Status usuário','status_usuario'],['Status sistema','status_sistema'],['Situação','situacao'],['Local instalação','local_instalacao'],['Texto breve','texto_breve'],['Plano manutenção','plano_manutencao']];
+  let html='<table><thead><tr>'+cols.map(c=>`<th>${c[0]}</th>`).join('')+'</tr></thead><tbody>';
+  const lim = rows.slice(0, 2000);
+  lim.forEach(r=>{ html+='<tr>'+cols.map(c=>`<td>${escapeHtml(c[1]==='mes'&&r[c[1]]?monthName(r[c[1]]):r[c[1]])}</td>`).join('')+'</tr>'; });
+  html+='</tbody></table>';
+  if (rows.length>2000) html += `<div class="note">Exibindo 2000 primeiros registros para desempenho. Refine filtros/busca para ver subconjuntos específicos.</div>`;
+  document.getElementById('tbl-detalhada').innerHTML = html;
+}
+
+function renderDicionario(){
+  const entries = Object.entries(AREA_CONFIG.mapeamento||{}).sort((a,b)=>a[0].localeCompare(b[0],'pt-BR'));
+  let html='<table><thead><tr><th>Código (derivado do Local de instalação)</th><th>Nome da área (editável)</th><th>Qtd. ordens (base total)</th></tr></thead><tbody>';
+  const counts=countBy(allRecords,r=>r.area_codigo);
+  entries.forEach(([k,v])=>{
+    html += `<tr><td>${escapeHtml(k)}</td><td><input type="text" data-area="${escapeHtml(k)}" value="${escapeHtml(v)}" /></td><td>${fmtNum(counts.get(k)||0)}</td></tr>`;
+  });
+  html+='</tbody></table>';
+  const wrap=document.getElementById('tbl-areas');
+  wrap.innerHTML=html;
+  wrap.querySelectorAll('input[data-area]').forEach(inp=>inp.addEventListener('change',()=>{
+    const k=inp.getAttribute('data-area');
+    AREA_CONFIG.mapeamento[k]=inp.value || k;
+    renderAll();
+  }));
+
+  // metas UI
+  const areaOpts=['(Global/Todas)','',...uniqueSorted(allRecords.map(r=>r.area))];
+  const selA=document.getElementById('meta-area');
+  if(selA && selA.options.length===0){
+    selA.innerHTML = ['<option value="Todas">(Global - Todas as áreas)</option>'].concat(uniqueSorted(Object.keys(AREA_CONFIG.mapeamento||{})).map(a=>`<option value="${escapeHtml((AREA_CONFIG.mapeamento||{})[a]||a)}">${escapeHtml((AREA_CONFIG.mapeamento||{})[a]||a)}</option>`)).join('');
+  } else if(selA) {
+    const cur=selA.value; selA.innerHTML = ['<option value="Todas">(Global - Todas as áreas)</option>'].concat(uniqueSorted(allRecords.map(r=>r.area)).map(a=>`<option value="${escapeHtml(a)}">${escapeHtml(a)}</option>`)).join(''); selA.value=cur||'Todas';
+  }
+  const selAno=document.getElementById('meta-ano');
+  if(selAno && selAno.options.length===0){ selAno.innerHTML = uniqueNums(allRecords.map(r=>r.ano)).map(a=>`<option>${a}</option>`).join(''); }
+  const selMes=document.getElementById('meta-mes');
+  if(selMes && selMes.options.length===0){ selMes.innerHTML = [...Array(12)].map((_,i)=>`<option value="${i+1}">${monthName(i+1)}</option>`).join(''); }
+  updateMetaAtual();
+}
+
+function updateMetaAtual(){
+  const a=document.getElementById('meta-area').value;
+  const y=document.getElementById('meta-ano').value;
+  const m=document.getElementById('meta-mes').value;
+  const meta=getMeta(a,y,m);
+  document.getElementById('meta-atual').innerHTML = `Meta atual (${escapeHtml(a)}, ${monthName(Number(m))}/${y}): <b>${meta==null?'Não informada':fmtNum(meta)}</b>`;
+}
+
+function renderAtualizacao(){
+  document.getElementById('fonte-path').textContent = (RAW.metadata && RAW.metadata.caminho_fonte) || 'METRICAS DE ORDENS.XLSX';
+  const m=RAW.metadata||{};
+  document.getElementById('resumo-base').innerHTML = `
+    <div class="metric-row"><span>Fonte</span><b>${escapeHtml(m.fonte||'')}</b></div>
+    <div class="metric-row"><span>Gerado em</span><b>${escapeHtml(m.gerado_em||'')}</b></div>
+    <div class="metric-row"><span>Total registros na base</span><b>${fmtNum(m.total_registros_base)}</b></div>
+    <div class="metric-row"><span>Total ordens únicas consideradas</span><b>${fmtNum(m.total_ordens_unicas)}</b></div>
+    <div class="metric-row"><span>Ordens duplicadas desconsideradas</span><b>${fmtNum(m.ordens_duplicadas_desconsideradas)}</b></div>
+    <div class="metric-row"><span>Anos encontrados</span><b>${escapeHtml((m.anos||[]).join(', '))}</b></div>
+    <div class="metric-row"><span>Áreas classificadas</span><b>${fmtNum(Object.keys(AREA_CONFIG.mapeamento||{}).length)}</b></div>
+    <div class="metric-row"><span>Status de sistema no dicionário</span><b>${fmtNum(Object.keys(STATUS_CONFIG.status_sistema||{}).length)}</b></div>`;
+  document.getElementById('subtitle').textContent = `Fonte real: ${m.fonte||'METRICAS DE ORDENS.XLSX'} | Ordens únicas: ${fmtNum(m.total_ordens_unicas)} | Gerado em: ${m.gerado_em||'-'} | Atualização conforme filtros`;
+}
+
+function downloadJson(filename, obj){
+  const blob = new Blob([JSON.stringify(obj,null,2)], {type:'application/json;charset=utf-8'});
+  const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download=filename; a.click(); setTimeout(()=>URL.revokeObjectURL(a.href), 1000);
+}
+
+// init
+renderTabs();
+buildFilters();
+
+document.getElementById('busca-tabela').addEventListener('input', e=>{ state.busca=e.target.value; renderTabela(getFiltered()); });
+
+document.getElementById('btn-export-status').addEventListener('click',()=>downloadJson('classificacao_status.json', STATUS_CONFIG));
+document.getElementById('btn-export-areas').addEventListener('click',()=>downloadJson('classificacao_areas.json', AREA_CONFIG));
+document.getElementById('btn-export-metas').addEventListener('click',()=>downloadJson('metas.json', METAS));
+
+document.addEventListener('change', (e)=>{
+  if(['meta-area','meta-ano','meta-mes'].includes(e.target.id)) updateMetaAtual();
+});
+document.getElementById('btn-salvar-meta').addEventListener('click',()=>{
+  const area=document.getElementById('meta-area').value;
+  const ano=document.getElementById('meta-ano').value;
+  const mes=String(document.getElementById('meta-mes').value).padStart(2,'0');
+  const val=document.getElementById('meta-valor').value;
+  const key=`${ano}-${mes}`;
+  if(val===''||val==null){ updateMetaAtual(); return; }
+  if(area==='Todas'){
+    if(!METAS.meta_global_mensal) METAS.meta_global_mensal={};
+    METAS.meta_global_mensal[key]=Number(val);
+  } else {
+    if(!METAS.metas_por_area_mes) METAS.metas_por_area_mes={};
+    if(!METAS.metas_por_area_mes[area]) METAS.metas_por_area_mes[area]={};
+    METAS.metas_por_area_mes[area][key]=Number(val);
+  }
+  updateMetaAtual();
+  renderAll();
+});
+
+renderAll();
+</script>
+</body>
+</html>
